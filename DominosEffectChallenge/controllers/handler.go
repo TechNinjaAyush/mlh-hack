@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
 	"os"
 	"servicedependecygraph/DominosEffectChallenge/models"
 )
@@ -55,8 +56,11 @@ func DFS(service map[string][]models.ServiceGraph) {
 	}
 
 	// traverse from all nodes (or a specific node)
+
 	for k := range service {
+
 		DFS_TRAVERSAL(k, service, visited_services, Impacted_Services)
+
 	}
 
 	// print results
@@ -66,13 +70,16 @@ func DFS(service map[string][]models.ServiceGraph) {
 	}
 }
 
-// helper to convert map keys to slice
 func keys(m map[string]bool) []string {
 	result := []string{}
 	for k := range m {
 		result = append(result, k)
 	}
 	return result
+}
+
+func ApplyGlitch(service models.ServiceGraph) {
+
 }
 
 func JsonMarhslling(w http.ResponseWriter, r *http.Request) {
@@ -116,6 +123,7 @@ func JsonMarhslling(w http.ResponseWriter, r *http.Request) {
 	}
 
 	Data := BuildReverseAdjacencyGraph(services)
+
 	DFS(Data)
 
 	fmt.Println("\nReverse Dependency Graph:")
