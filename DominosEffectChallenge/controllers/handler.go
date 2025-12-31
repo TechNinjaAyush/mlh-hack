@@ -4,189 +4,99 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
-	"time"
-
 	"servicedependecygraph/DominosEffectChallenge/models"
+
+	"github.com/gin-gonic/gin"
 )
 
-func BuildReverseAdjacencyGraph(services []models.ServiceGraph) map[string][]models.ServiceGraph {
-	reverse := make(map[string][]models.ServiceGraph)
+type ServiceDependency struct {
+	Name string `json:"name"`
 
-	for _, s := range services {
-		if _, ok := reverse[s.Name]; !ok {
-			reverse[s.Name] = []models.ServiceGraph{}
-		}
-	}
+	DependsOn []string `json:"depends_on"`
 
-	for _, s := range services {
-		for _, dep := range s.DependsOn {
-			reverse[dep] = append(reverse[dep], s)
-		}
-	}
-
-	return reverse
-
+	Health float32 `json:"health"`
 }
 
-func DFS_TRAVERSAL(Service_Name string, service map[string][]models.ServiceGraph, visited_services map[string]bool, impacted_services map[string]map[string]bool) {
-	if visited_services[Service_Name] {
-		return
-	}
-	visited_services[Service_Name] = true
+func JsonMarshalling(c *gin.Context) {
 
-	if _, exists := impacted_services[Service_Name]; !exists {
-		impacted_services[Service_Name] = make(map[string]bool)
-	}
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-ali")
 
-	for _, s := range service[Service_Name] {
-		impacted_services[Service_Name][s.Name] = true
+	ch1 := make(chan models.Payload)
 
-		DFS_TRAVERSAL(s.Name, service, visited_services, impacted_services)
+	filepath := "sample/service.json"
 
-		for dep := range impacted_services[s.Name] {
-			impacted_services[Service_Name][dep] = true
+	file, err := os.ReadFile(filepath)
 
-		}
-	}
-}
-
-func ApplyGlitch(service []models.ServiceGraph) []string {
-	if len(service) == 0 {
-		return nil
-	}
-
-	rand.Seed(time.Now().UnixNano())
-
-	totalGlitches := 15
-	glitchedRoots := make([]string, 0, totalGlitches)
-
-	// Build list of all service names
-	names := make([]string, 0, len(service))
-	for _, s := range service {
-		names = append(names, s.Name)
-	}
-
-	seen := make(map[string]bool)
-
-	for i := 0; i < totalGlitches; i++ {
-
-		idx := rand.Intn(len(names))
-		chosen := names[idx]
-
-		min := float32(0.2)
-		max := float32(0.5)
-		drop := min + rand.Float32()*(max-min)
-
-		for j := range service {
-			if service[j].Name == chosen {
-				service[j].Health -= drop
-				if service[j].Health < 0 {
-					service[j].Health = 0
-				}
-
-				if service[j].Health < 0.7 && !seen[chosen] {
-					glitchedRoots = append(glitchedRoots, chosen)
-					seen[chosen] = true
-				}
-
-				break
-			}
-		}
-	}
-
-	return glitchedRoots
-}
-
-func DFS(service map[string][]models.ServiceGraph, glitch_service []string) {
-	Impacted_Services := make(map[string]map[string]bool)
-
-	visited_services := make(map[string]bool)
-	for k := range service {
-		visited_services[k] = false
-	}
-
-	uniqueRoots := make([]string, 0, len(glitch_service))
-	seen := make(map[string]bool)
-	for _, g := range glitch_service {
-		if !seen[g] {
-			seen[g] = true
-			uniqueRoots = append(uniqueRoots, g)
-		}
-	}
-	for _, glitch := range uniqueRoots {
-		if _, ok := service[glitch]; !ok {
-			service[glitch] = []models.ServiceGraph{}
-			visited_services[glitch] = false
-		}
-
-		for k := range visited_services {
-			visited_services[k] = false
-		}
-
-		DFS_TRAVERSAL(glitch, service, visited_services, Impacted_Services)
-	}
-
-	for serviceName, deps := range Impacted_Services {
-		time.Sleep(2 * time.Second)
-		fmt.Printf("Failed service: %s\n", serviceName)
-		fmt.Printf("Impacted services: %v\n", keys(deps))
-	}
-}
-
-func keys(m map[string]bool) []string {
-	result := []string{}
-	for k := range m {
-		result = append(result, k)
-	}
-	return result
-}
-
-func JsonMarhslling(w http.ResponseWriter, r *http.Request) {
-	fmt.Print("started json marhaling.....\n")
-
-	fileBytes, err := os.ReadFile("sample/service.json")
 	if err != nil {
-		log.Printf("failed to read the file %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Fatalf("Error in opening file\n")
+
+	}
+
+	data := string(file)
+
+	fmt.Printf("data is %v", data)
+
+	services := []ServiceDependency{}
+
+	if err := json.Unmarshal(file, &services); err != nil {
+
+		log.Printf("ERROR:Failed to unmarshal json:%v\n", err)
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"Error": err.Error(),
+		})
+
 		return
 	}
 
-	var services []models.ServiceGraph
-	if err := json.Unmarshal(fileBytes, &services); err != nil {
-		log.Printf("ERROR: failed to unmarshal json :%v", err)
-		http.Error(w, "Internal server Error", http.StatusInternalServerError)
-		return
-	}
+	healthMap := make(map[string]float32)
 
-	for _, service := range services {
-		fmt.Printf(" - Service: %s, Health: %.2f, Depends On: %v\n", service.Name, service.Health, service.DependsOn)
-	}
+	for _, s := range services {
 
-	glitchService := ApplyGlitch(services)
-
-	for _, k := range glitchService {
-
-		fmt.Printf("glitch service is %s :\n", k)
+		healthMap[s.Name] = s.Health
 
 	}
 
-	Data := BuildReverseAdjacencyGraph(services)
+	//created reversedependecy  map
 
-	DFS(Data, glitchService)
+	reverseDependency := make(map[string][]string)
 
-	fmt.Println("\nReverse Dependency Graph:")
-	for dep, dependents := range Data {
-		fmt.Printf("\nService: %s is depended on by:\n", dep)
-		for _, s := range dependents {
-			fmt.Printf("   - %s (Health: %.2f, DependsOn: %v)\n", s.Name, s.Health, s.DependsOn)
+	for _, s := range services {
+
+		for _, d := range s.DependsOn {
+
+			reverseDependency[d] = append(reverseDependency[d], s.Name)
+
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(services); err != nil {
-		log.Printf("ERROR: failed to encode response %v", err)
+	for k, s := range reverseDependency {
+
+		fmt.Printf("%s depends on this services %s\n", k, s)
+
 	}
+
+	revBytes, _ := json.Marshal(gin.H{
+		"type": "reverse_dependency",
+		"data": reverseDependency,
+	})
+
+	fmt.Fprintf(c.Writer, "data: %s\n\n", revBytes)
+	c.Writer.Flush()  
+
+	go DFS(reverseDependency, healthMap, ch1)
+
+	for payload := range ch1 {
+
+		bytes, _ := json.Marshal(payload)
+
+		fmt.Fprintf(c.Writer, "data: %s\n\n", bytes)
+		c.Writer.Flush()
+
+	}
+
 }

@@ -1,26 +1,28 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"net/http"
 	"servicedependecygraph/DominosEffectChallenge/controllers"
+	"time"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
 
-	port := "8080"
-	fmt.Println("Service dependecy graph started succesfully...............")
+	r := gin.Default()
 
-	http.HandleFunc("/ServiceGraph", controllers.JsonMarhslling)
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173"}, // The React Port
+		AllowMethods:     []string{"GET", "POST"},
+		AllowHeaders:     []string{"Origin"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
-	err := http.ListenAndServe(":"+port, nil)
+	r.GET("/service", controllers.JsonMarshalling)
 
-	if err != nil {
-		log.Fatalf("Error in starting server: %v", err)
-	} 
-  
-	
-	
+	r.Run()
 
 }
