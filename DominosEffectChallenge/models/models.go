@@ -9,9 +9,8 @@ type ServiceGraph struct {
 }
 
 type Payload struct {
-	Root        string    `json:"root"`
-	FailedNodes []string  `json:"failednodes"`
-	Time        time.Time `json:"failed_time"`
-
-	BlastRadius int `json:"blast_radius"`
+	Root        string    `json:"Root"`
+	FailedNodes []string  `json:"FailedNodes"`
+	Time        time.Time `json:"Time"`
+	BlastRadius int       `json:"BlastRadius"`
 }

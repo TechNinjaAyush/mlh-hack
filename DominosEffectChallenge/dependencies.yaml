@@ -1,0 +1,41 @@
+services:
+  api-gateway:
+    depends_on:
+      - auth-service
+      - catalog-service
+
+  auth-service:
+    depends_on:
+      - user-service
+
+  catalog-service:
+    depends_on:
+      - inventory-service
+      - pricing-service
+
+  user-service:
+    depends_on: []
+
+  inventory-service:
+    depends_on:
+      - warehouse-service
+
+  pricing-service:
+    depends_on:
+      - warehouse-service
+      - currency-service
+
+  warehouse-service:
+    depends_on: []
+
+  currency-service:
+    depends_on:
+      - exchange-rate-service
+
+  exchange-rate-service:
+    depends_on: []
+
+  order-service:
+    depends_on:
+      - auth-service
+      - exchange-rate-service

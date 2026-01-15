@@ -1,0 +1,59 @@
+version: 1
+
+services:
+  api-gateway:
+    paths:
+      - services/api-gateway/**
+    criticality: high
+
+  auth-service:
+    paths:
+      - services/auth/**
+    criticality: high
+
+  user-service:
+    paths:
+      - services/user/**
+    criticality: medium
+
+  catalog-service:
+    paths:
+      - services/catalog/**
+    criticality: medium
+
+  inventory-service:
+    paths:
+      - services/inventory/**
+    criticality: medium
+
+  pricing-service:
+    paths:
+      - services/pricing/**
+    criticality: high
+
+  warehouse-service:
+    paths:
+      - services/warehouse/**
+    criticality: medium
+
+  currency-service:
+    paths:
+      - services/currency/**
+    criticality: high
+
+  exchange-rate-service:
+    paths:
+      - services/exchange-rate/**
+    criticality: medium
+
+  order-service:
+    paths:
+      - services/order/**
+    criticality: high
+
+config_files:
+  - docker-compose.yml
+  - helm/**
+  - k8s/**
+  - values.yaml
+  - .env*

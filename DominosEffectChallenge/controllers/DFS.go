@@ -1,9 +1,10 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
-	"servicedependecygraph/DominosEffectChallenge/models"
+	"servicedependency/models"
 	"time"
 )
 
@@ -24,23 +25,31 @@ func DFStraversal(glitch_service string, current string, reverseDepend map[strin
 
 }
 
-func DFS(reverseDepend map[string][]string, healthMap map[string]float32, ch chan models.Payload) {
-	// n random ticks where we take any random service and
-	//convert healthmap into slice to pick random service to reduce health
+func DFS(reverseDepend map[string][]string, healthMap map[string]float32, ch chan models.Payload, ctx context.Context) {
+	defer close(ch)
 
 	rand.Seed(time.Now().UnixNano())
 	var pairs []string
 	for k := range healthMap {
 		pairs = append(pairs, k)
-
 	}
 
-	for iter := 0; iter < 10; iter++ {
+	// Run for more iterations or indefinitely
+	for iter := 0; iter < 15; iter++ {
 
+		select {
+
+		case <-ctx.Done():
+			fmt.Println("DFS  stopped:client disconnected")
+			return
+
+		default:
+
+		}
 		idx := rand.Intn(len(pairs))
 		pick_service := pairs[idx]
 
-		fmt.Printf("service picked: %s\n", pick_service)
+		fmt.Printf(" service picked: %s (iteration %d/50)\n", pick_service, iter+1)
 
 		drop := 0.2 + rand.Float32()*(0.5-0.2)
 		healthMap[pick_service] -= drop
@@ -48,7 +57,6 @@ func DFS(reverseDepend map[string][]string, healthMap map[string]float32, ch cha
 		fmt.Printf("current health: %.2f\n", healthMap[pick_service])
 
 		if healthMap[pick_service] < 0.7 && healthMap[pick_service] > 0 {
-
 			fmt.Printf("Applying DFS on %s\n", pick_service)
 
 			visited_services := make(map[string]bool)
@@ -62,31 +70,35 @@ func DFS(reverseDepend map[string][]string, healthMap map[string]float32, ch cha
 				for _, dep := range deps {
 					healthMap[dep] = max(0, healthMap[dep]-alpha*(0.7-healthMap[root_node]))
 				}
-
 			}
 
 			for k, v := range impacted_services {
-
-				p := models.Payload{
-					Root:        k,
-					FailedNodes: v,
-					Time:        time.Now(),
-					BlastRadius: len(v),
+				if len(v) > 0 {
+					p := models.Payload{
+						Root:        k,
+						FailedNodes: v,
+						Time:        time.Now(),
+						BlastRadius: len(v),
+					}
+					fmt.Printf("📤 Sending: %s → impacted: %v (blast radius: %d)\n", k, v, len(v))
+					select {
+					case <-ctx.Done():
+						return
+					case ch <- p:
+					}
 				}
-
-				fmt.Printf("failed service %s → impacted: %v\n and blast radius of  this service is %d", k, v, len(v))
-				ch <- p
-
 			}
-
 		}
 
-		time.Sleep(4 * time.Second)
-
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(4 * time.Second):
+		}
 	}
 
-	close(ch)
-
-	// DFStraversal("service-I", "service-I", reverseDepend, visited_services, impacted_services)
+	fmt.Println("⏹️  DFS completed, keeping channel open...")
+	time.Sleep(10 * time.Second)
+	fmt.Println("📪 Channel closed")
 
 }
