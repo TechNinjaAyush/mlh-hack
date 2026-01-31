@@ -45,3 +45,70 @@ type Payload struct {
     BlastRadius int       `json:"BlastRadius"` // Total count of affected nodes
     RCA         string    `json:"rca"`         // Neural Forensic Analysis
 }
+🛠 Advanced Features
+
+    Atomic State Management: React-based health maps ensure that UI updates are memoized, preventing expensive re-renders during high-frequency failure events.
+
+    Physics-Based Visualization: Utilizes D3 force-simulation to physically shift the graph layout and apply "gravity" to the root cause node during failure.
+
+    Contextual Remediation: Gemini analysis includes specific mitigation steps, such as suggested shell commands or circuit-breaker adjustments.
+
+    Backpressure-Safe SSE: The Go server implements channel-based buffering to handle high-frequency event bursts without overwhelming the client main thread.
+
+    Heuristic Decay: Automatic "health recovery" visual markers that clear after 8 seconds of system stability.
+
+📊 Technical Stack
+Component	Technology	Rationale
+Backend	Go 1.21+	Optimized for high-concurrency goroutines and memory-safe graph traversal.
+AI Engine	Gemini 1.5 Flash	Lowest latency-to-context ratio for real-time forensic generation.
+Streaming	SSE (Server-Sent Events)	Native browser support for unidirectional, low-overhead telemetry streams.
+Visualization	React-Force-Graph	Canvas-based rendering capable of handling 500+ node meshes at 60FPS.
+UI/UX	Tailwind CSS	Cyberpunk-inspired dark mode (Basalt theme) for high-contrast SRE visibility.
+🔧 Installation
+1. Prerequisites
+
+    Go (Golang) 1.21 or higher.
+
+    Node.js 18.x and npm/yarn.
+
+    Google AI (Gemini) API Key.
+
+2. Backend Setup
+Bash
+
+# Clone the repository
+git clone [https://github.com/your-username/basalt-sentinel.git](https://github.com/your-username/basalt-sentinel.git)
+cd basalt-sentinel/backend
+
+# Set your Gemini API Key
+export GEMINI_API_KEY='your_api_key_here'
+
+# Install Go dependencies
+go mod tidy
+
+# Start the Go engine
+go run main.go
+
+3. Frontend Setup
+Bash
+
+# Navigate to frontend directory
+cd ../frontend
+
+# Install packages
+npm install
+
+# Start the dashboard
+npm start
+
+🚢 Deployment
+Docker Deployment
+
+The most reliable way to deploy the Basalt Sentinel is via the integrated container:
+Bash
+
+# Build the integrated image
+docker build -t basalt-sentinel:latest .
+
+# Run the container with environment variables
+docker run -p 8080:8080 -e GEMINI_API_KEY='your_key' basalt-sentinel:latest
