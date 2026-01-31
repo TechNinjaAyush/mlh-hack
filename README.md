@@ -77,7 +77,7 @@ UI/UX	Tailwind CSS	Cyberpunk-inspired dark mode (Basalt theme) for high-contrast
 Bash
 
 # Clone the repository
-git clone [https://github.com/your-username/basalt-sentinel.git](https://github.com/your-username/basalt-sentinel.git)
+git clone https://github.com/TechNinjaAyush/mlh-hack
 cd basalt-sentinel/backend
 
 # Set your Gemini API Key
