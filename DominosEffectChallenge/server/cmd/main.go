@@ -15,8 +15,16 @@ func Entrypoint(c *gin.Context) {
 }
 
 func main() {
-	r := gin.Default()
 
+	// mongo, err := db.ConnectToIncidents()
+
+	// if err != nil {
+	// 	log.Fatalf("Error in connecting databasev %v", err)
+	// }
+
+	// h := controllers.NewHandler(mongo)
+
+	r := gin.Default()
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"}, // The React Port
 		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
@@ -26,8 +34,11 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	//  connecting to database
+
 	r.GET("/", Entrypoint)
 	r.GET("/service", controllers.JsonMarshalling)
 
 	r.Run()
+
 }

@@ -6,9 +6,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"servicedependency/models"
 
 	"github.com/gin-gonic/gin"
-	"github.com/goccy/go-yaml"
+	"github.com/google/generative-ai-go/genai"
+	"google.golang.org/api/option"
 )
 
 type DependencyFile struct {
@@ -55,16 +57,18 @@ func BuildGraph(reverseDependency map[string][]string) map[string]interface{} {
 func JsonMarshalling(c *gin.Context) {
 	// Set SSE headers
 
-	// ctx := c.Request.Context()
+	ctx := c.Request.Context()
+	healthMap := make(map[string]float32)
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
 
-	// ch1 := make(chan models.Payload, 10)
-	filepath := "./dependencies.yaml"
+	ch1 := make(chan models.Payload, 10)
+	filepath := "./sample/service.json"
 
 	file, err := os.ReadFile(filepath)
+
 	if err != nil {
 		log.Fatalf("Error in opening file\n")
 	}
@@ -72,26 +76,31 @@ func JsonMarshalling(c *gin.Context) {
 	data := string(file)
 	fmt.Printf("data is %v\n", data)
 
-	var deps DependencyFile
-	if err := yaml.Unmarshal(file, &deps); err != nil {
-		log.Printf("ERROR:Failed to unmarshal yaml:%v\n", err)
+	var deps []models.ServiceGraph
+	if err := json.Unmarshal(file, &deps); err != nil {
+		log.Printf("ERROR:Failed to unmarshal json:%v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"Error": err.Error(),
 		})
 		return
 	}
 
-	for service, dep := range deps.Services {
-		fmt.Printf("service name is %s :\ndepends on:%v\n", service, dep.DependsOn)
-	}
-
 	reverseDependency := make(map[string][]string)
 
-	for service, cfg := range deps.Services {
-		for _, dep := range cfg.DependsOn {
-			reverseDependency[dep] = append(reverseDependency[dep], service)
+	for _, svc := range deps {
+		for _, dep := range svc.DependsOn {
+			reverseDependency[dep] = append(reverseDependency[dep], svc.Name)
+
 		}
 	}
+
+	for _, svc := range deps {
+
+		healthMap[svc.Name] = svc.Health
+
+	}
+
+	fmt.Printf("dependecy is %v", deps)
 
 	for dep, dependents := range reverseDependency {
 		fmt.Printf("%s is depended on by %v\n", dep, dependents)
@@ -103,5 +112,48 @@ func JsonMarshalling(c *gin.Context) {
 	c.Writer.Flush()
 
 	fmt.Println("📊 Sent initial graph structure")
+
+	apiKey := "AIzaSyBPv8vtdFJxApayRmP2_hNQikunnMdfE4c"
+	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+
+	if err != nil {
+		log.Printf("failed to create geini client:%v", err)
+	}
+
+	defer client.Close()
+
+	go DFS(client, reverseDependency, healthMap, ch1, ctx)
+
+	for {
+
+		select {
+		case <-ctx.Done():
+			fmt.Println("Client disconnected stop sse")
+			return
+
+		case payload, ok := <-ch1:
+
+			if !ok {
+
+				fmt.Println("Channel closed- stop SSE")
+				return
+			}
+
+			bytes, err := json.Marshal(payload)
+
+			if err != nil {
+				continue
+			}
+
+			_, err = fmt.Fprintf(c.Writer, "data:%s\n\n", bytes)
+
+			if err != nil {
+				return
+			}
+
+			c.Writer.Flush()
+
+		}
+	}
 
 }

@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"servicedependency/models"
 	"time"
+
+	"github.com/google/generative-ai-go/genai"
 )
 
 func DFStraversal(glitch_service string, current string, reverseDepend map[string][]string, visited_services map[string]bool, impacted_services map[string][]string) {
@@ -25,16 +27,53 @@ func DFStraversal(glitch_service string, current string, reverseDepend map[strin
 
 }
 
-func DFS(reverseDepend map[string][]string, healthMap map[string]float32, ch chan models.Payload, ctx context.Context) {
+func GenerateRCAReport(ctx context.Context, client *genai.Client, root string, impacted []string, meta map[string]models.ServiceGraph) string {
+	if client == nil {
+		return "AI Analysis unavailable: Client not initialized"
+	}
+
+	model := client.GenerativeModel("gemini-2.5-flash")
+
+	// Fetch the specific metadata from your metaLookup map
+	serviceInfo, exists := meta[root]
+	reason := "Unknown technical failure"
+	if exists {
+		reason = serviceInfo.Reason
+	}
+
+	// Construct the SRE-style prompt
+	prompt := fmt.Sprintf(`
+        You are an SRE bot. 
+        Service '%s' failed. 
+        Predefined Root Cause: %s. 
+        Cascading Impact: %v. 
+        Provide a concise, technical RCA explaining the propagation you have to provide also the solution of impact in terms of technical aspect  in precise way you have to just pick any  dummy random users and just tell the  any dummy  number of users impacted  also the the dummy risk score.
+    `, root, reason, impacted)
+
+	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+
+	if err != nil {
+		return fmt.Sprintf("RCA Error: %s (Check: %s)", err.Error(), reason)
+	}
+
+	if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+		// Return the text from the first part of the first candidate
+		return fmt.Sprintf("%v", resp.Candidates[0].Content.Parts[0])
+	}
+
+	return "No specific RCA generated."
+}
+func DFS(client *genai.Client, reverseDepend map[string][]string, healthMap map[string]float32, ch chan models.Payload, ctx context.Context) {
 	defer close(ch)
 
 	rand.Seed(time.Now().UnixNano())
 	var pairs []string
+
+	metaLookup := make(map[string]models.ServiceGraph)
 	for k := range healthMap {
 		pairs = append(pairs, k)
 	}
 
-	// Run for more iterations or indefinitely
 	for iter := 0; iter < 15; iter++ {
 
 		select {
@@ -73,14 +112,20 @@ func DFS(reverseDepend map[string][]string, healthMap map[string]float32, ch cha
 			}
 
 			for k, v := range impacted_services {
+
 				if len(v) > 0 {
+					rcaReport := GenerateRCAReport(ctx, client, k, v, metaLookup)
+
 					p := models.Payload{
+
 						Root:        k,
 						FailedNodes: v,
 						Time:        time.Now(),
 						BlastRadius: len(v),
+						RCA:         rcaReport,
 					}
 					fmt.Printf("📤 Sending: %s → impacted: %v (blast radius: %d)\n", k, v, len(v))
+
 					select {
 					case <-ctx.Done():
 						return
