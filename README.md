@@ -78,7 +78,8 @@ Bash
 
 # Clone the repository
 git clone https://github.com/TechNinjaAyush/mlh-hack
-cd basalt-sentinel/backend
+cd DominosEffectChallenge
+run command: go run cmd/server/main.go
 
 # Set your Gemini API Key
 export GEMINI_API_KEY='your_api_key_here'
